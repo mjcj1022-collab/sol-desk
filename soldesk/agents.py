@@ -160,6 +160,6 @@ class Risk:
     def can_open(self, balance: float, start: float, open_count: int) -> Tuple[bool, str]:
         if open_count >= self.cfg.max_open_positions:
             return False, "max open positions"
-        if (1 - balance / start) * 100 >= self.cfg.daily_loss_limit_pct:
+        if (1 - balance / start) * 100 >= self.cfg.daily_loss_limit_pct - 1e-9:  # tolerance: 80.00000000000001 must still trip
             return False, "daily loss limit hit — kill switch"
         return True, ""
