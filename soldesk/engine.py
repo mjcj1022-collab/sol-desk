@@ -29,47 +29,14 @@ class Engine:
         self.start_ts = time.time()
         self.clock = self.start_ts
         self.ticks = 0
-        resumed = self._resume()
         self.ledger.set("config", {k: getattr(cfg, k) for k in cfg.__dataclass_fields__})
-        msg = f"mode={cfg.mode} balance=${cfg.starting_balance:.2f} (PAPER)"
-        if resumed:
-            msg = f"mode={cfg.mode} RESUMED cash=${self.cash:.2f} open={len(self.positions)} (PAPER)"
-        self._log(self.clock, "START", "", msg)
-
-    def _resume(self) -> bool:
-        """Pick up where a previous run left off (restart, redeploy, crash) instead of resetting to a fresh balance.
-        Open positions come back with their stop; the trailing state restarts from entry, which is conservative."""
-        rows = self.ledger.open_rows()
-        realized = self.ledger.realized()
-        if not rows and realized == 0 and not self.ledger.all_closed():
-            return False
-        for r in rows:
-            pos = Position(r["id"], r["symbol"], r["mint"], r["pair_address"], r["entry_price"], r["size_usd"],
-                           r["qty"], r["stop_price"], r["entry_price"], opened_at=r["opened_at"],
-                           last_price=r["entry_price"])
-            self.positions[pos.id] = pos
-        self.cash = self.cfg.starting_balance + realized - sum(p.size_usd for p in self.positions.values())
-        return True
-
-    def _maybe_weekly_report(self) -> None:
-        """Send the edge report to Telegram once every 7 days (real clock only)."""
-        if self.fast or not self.notifier.enabled or not self.cfg.weekly_report:
-            return
-        now = time.time()
-        last = self.ledger.get("last_report_ts")
-        if last is None:
-            self.ledger.set("last_report_ts", now)   # first report one week after first start
-            return
-        if now - last < 7 * 86400:
-            return
-        from .report import analyse, load, render, send_telegram
-        trades, cfg = load(self.cfg.db_path, 7)
-        send_telegram(render(analyse(trades, cfg), "last 7 days"))
-        self.ledger.set("last_report_ts", now)
+        self._log(self.clock, "START", "", f"mode={cfg.mode} balance=${cfg.starting_balance:.2f} (PAPER)")
 
     # ------------------------------------------------------------------
     def _log(self, ts: float, kind: str, symbol: str = "", detail: str = "") -> None:
         self.ledger.log(ts, kind, symbol, detail)
+        if not self.fast and kind != "KILL":     # console/cloud logs; kills are too noisy
+            print(f"{time.strftime('%H:%M:%S')} {kind:<5} {('$' + symbol) if symbol else ''} {detail}", flush=True)
         eq = self.equity() if hasattr(self, "positions") else self.cfg.starting_balance
         self.notifier.event(kind, symbol, detail, eq)
 
@@ -142,10 +109,6 @@ class Engine:
         except Exception as e:   # network blips etc. never kill the loop
             self._log(self.now(), "ERROR", "", repr(e)[:200])
         self._publish()
-        try:
-            self._maybe_weekly_report()
-        except Exception as e:
-            self._log(self.now(), "ERROR", "", "weekly report: " + repr(e)[:180])
 
     def run(self, max_ticks: Optional[int] = None) -> None:
         try:
