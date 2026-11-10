@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sol-desk · paper terminal</title>
+<style>
+  :root{--bg:#0b0a14;--panel:#14121f;--line:#262238;--txt:#e6e3f2;--mut:#8a84a3;
+        --win:#3ddc97;--loss:#ff5d73;--acc:#a78bfa;--warn:#f5b84b;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:20px;letter-spacing:.3px}
+  .pill{font:600 11px var(--mono);padding:3px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut)}
+  .pill.paper{color:var(--warn);border-color:#5a4520}
+  .pill.on{color:var(--win);border-color:#1d5a42}
+  .bal{text-align:right}
+  .bal .big{font:700 30px var(--mono)}
+  .bal .sub{color:var(--mut);font:12px var(--mono)}
+  main{display:grid;gap:14px;padding:16px 20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h2{margin:0 0 10px;font:600 11px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)}
+  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .agent{border:1px solid var(--line);border-radius:10px;padding:10px}
+  .agent b{display:block;font:700 11px var(--mono);color:var(--acc)}
+  .agent span{font:700 20px var(--mono)}
+  .agent small{display:block;color:var(--mut);font-size:11px}
+  table{width:100%;border-collapse:collapse;font:12px var(--mono)}
+  td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--mut);font-weight:500}
+  .pos{color:var(--win)} .neg{color:var(--loss)}
+  .log{max-height:340px;overflow:auto;font:12px var(--mono)}
+  .log div{padding:2px 0;white-space:nowrap}
+  .k{display:inline-block;width:46px;font-weight:700}
+  .k.WIN{color:var(--win)} .k.LOSS{color:var(--loss)} .k.KILL{color:#c06} .k.ENTER{color:var(--acc)}
+  .k.SCORE{color:#7aa2ff} .k.ERROR,.k.SKIP{color:var(--warn)}
+  .stats div{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);font:13px var(--mono)}
+  canvas{width:100%;height:120px}
+  .empty{color:var(--mut);font-size:12px}
+  footer{padding:0 20px 24px;color:var(--mut);font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>sol-desk <span class="pill paper">PAPER</span> <span id="run" class="pill">—</span></h1>
+    <div class="sub" style="color:var(--mut);font:12px var(--mono);margin-top:4px" id="meta">connecting…</div>
+  </div>
+  <div class="bal"><div class="big" id="equity">$—</div><div class="sub" id="eqsub"></div></div>
+</header>
+
+<main>
+  <section class="card" style="grid-column:1/-1">
+    <h2>Live flow · hard handoffs</h2>
+    <div class="agents">
+      <div class="agent"><b>SCOUT</b><span id="a-seen">0</span><small>pairs seen</small></div>
+      <div class="agent"><b>FILTER</b><span id="a-killed">0</span><small>killed (8 hard rules)</small></div>
+      <div class="agent"><b>ANALYST</b><span id="a-scored">0</span><small>scored 0–100</small></div>
+      <div class="agent"><b>EXECUTOR</b><span id="a-trades">0</span><small>trades taken</small></div>
+      <div class="agent"><b>RISK</b><span id="a-stops">0</span><small>stops hit</small></div>
+      <div class="agent"><b>LOGGER</b><span id="a-lines">0</span><small>open now</small></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Equity curve (closed trades)</h2>
+    <canvas id="curve" width="600" height="160"></canvas>
+  </section>
+
+  <section class="card stats">
+    <h2>Stats</h2>
+    <div><span>trades</span><span id="s-trades">0</span></div>
+    <div><span>wins / losses</span><span id="s-wl">0 / 0</span></div>
+    <div><span>win rate</span><span id="s-wr">—</span></div>
+    <div><span>realized P&amp;L</span><span id="s-real">$0.00</span></div>
+    <div><span>best trade</span><span id="s-best" class="pos">$0.00</span></div>
+    <div><span>worst trade</span><span id="s-worst" class="neg">$0.00</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Open positions</h2>
+    <div id="open"></div>
+  </section>
+
+  <section class="card">
+    <h2>tail -f night.log</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Closed trades</h2>
+    <div id="closed"></div>
+  </section>
+</main>
+<footer>Paper trading simulation. No wallet is connected and no real orders are sent. Memecoins are extremely high risk.</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const usd = v => (v < 0 ? "-$" : "$") + Math.abs(v).toFixed(2);
+const cls = v => v >= 0 ? "pos" : "neg";
+const t = ts => new Date(ts * 1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+
+function curve(closed, start) {
+  const c = $("curve"), g = c.getContext("2d");
+  const W = c.width, H = c.height; g.clearRect(0,0,W,H);
+  const pts = [start]; let run = start;
+  closed.forEach(r => { run += r.pnl; pts.push(run); });
+  if (pts.length < 2) { g.fillStyle="#8a84a3"; g.font="13px monospace"; g.fillText("waiting for first closed trade…",10,H/2); return; }
+  const lo = Math.min(...pts), hi = Math.max(...pts), pad = (hi - lo) * .15 || 1;
+  const y = v => H - 8 - (v - lo + pad) / (hi - lo + 2*pad) * (H - 16);
+  g.strokeStyle="#262238"; g.setLineDash([4,4]); g.beginPath(); g.moveTo(0,y(start)); g.lineTo(W,y(start)); g.stroke(); g.setLineDash([]);
+  g.strokeStyle = run >= start ? "#3ddc97" : "#ff5d73"; g.lineWidth = 2; g.beginPath();
+  pts.forEach((v,i) => { const x = i/(pts.length-1)*W; i ? g.lineTo(x,y(v)) : g.moveTo(x,y(v)); });
+  g.stroke();
+}
+
+async function refresh() {
+  let s;
+  try { s = await (await fetch("/api/state")).json(); } catch { $("meta").textContent = "dashboard can't reach engine"; return; }
+  const live = s.state.live || {}, st = s.stats, a = live.agents || {};
+  const start = live.start_balance || 0, eq = live.equity || 0, pct = start ? (eq/start-1)*100 : 0;
+  $("equity").textContent = usd(eq);
+  $("equity").className = "big " + cls(pct);
+  $("eqsub").textContent = `started ${usd(start)} · ${pct>=0?"+":""}${pct.toFixed(1)}% · cash ${usd(live.cash||0)}`;
+  $("run").textContent = live.running ? "running" : "stopped";
+  $("run").className = "pill " + (live.running ? "on" : "");
+  $("meta").textContent = `mode=${live.mode||"?"} · tick ${live.ticks||0} · ${st.trades} trades · ${st.wins} W · ${st.losses} L`;
+  $("a-seen").textContent = a.scout_seen||0; $("a-killed").textContent = a.filter_killed||0;
+  $("a-scored").textContent = a.analyst_scored||0; $("a-trades").textContent = st.trades + (a.open||0);
+  $("a-stops").textContent = a.risk_stops||0; $("a-lines").textContent = a.open||0;
+  $("s-trades").textContent = st.trades; $("s-wl").textContent = `${st.wins} / ${st.losses}`;
+  $("s-wr").textContent = st.trades ? (st.wins/st.trades*100).toFixed(0)+"%" : "—";
+  $("s-real").textContent = usd(st.realized); $("s-real").className = cls(st.realized);
+  $("s-best").textContent = usd(st.best); $("s-worst").textContent = usd(st.worst);
+
+  const ps = live.positions || [];
+  $("open").innerHTML = ps.length ? `<table><tr><th>coin</th><th>size</th><th>p&l</th><th>stop</th></tr>` +
+    ps.map(p => `<tr><td>$${p.symbol}</td><td>${usd(p.size)}</td><td class="${cls(p.pnl_pct)}">${p.pnl_pct.toFixed(1)}%</td>
+      <td>${p.trailing ? "trailing" : "hard"}</td></tr>`).join("") + "</table>" : `<div class="empty">flat — no open positions</div>`;
+
+  $("log").innerHTML = s.events.map(e => `<div>${t(e.ts)} <span class="k ${e.kind}">${e.kind}</span> ${e.symbol ? "$"+e.symbol : ""} ${e.detail||""}</div>`).join("");
+
+  const cl = s.closed.slice().reverse();
+  $("closed").innerHTML = cl.length ? `<table><tr><th>closed</th><th>coin</th><th>size</th><th>p&l</th><th>%</th><th>exit</th></tr>` +
+    cl.map(r => `<tr><td>${t(r.closed_at)}</td><td>$${r.symbol}</td><td>${usd(r.size_usd)}</td>
+      <td class="${cls(r.pnl)}">${usd(r.pnl)}</td><td class="${cls(r.pnl)}">${(r.pnl/r.size_usd*100).toFixed(1)}%</td><td>${r.reason}</td></tr>`).join("") + "</table>"
+    : `<div class="empty">no closed trades yet</div>`;
+  curve(s.closed, start);
+}
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>
