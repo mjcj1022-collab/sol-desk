@@ -36,6 +36,9 @@ class Config:
     tick_seconds: float = 15.0          # how often the loop runs
     db_path: str = "soldesk.db"
     dashboard_port: int = 8787
+    dashboard_host: str = "127.0.0.1"   # cloud: 0.0.0.0 (then SOLDESK_DASH_PASSWORD is required)
+    dash_password: str = ""
+    weekly_report: bool = True          # send the edge report to Telegram every 7 days while running
 
     # --- scout ---
     min_age_min: float = 30.0

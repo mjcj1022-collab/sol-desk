@@ -1,4 +1,4 @@
-import report
+from soldesk import report
 
 
 def trade(pnl, size=10.0, entry=1.015, exit_=1.0, reason="stop"):

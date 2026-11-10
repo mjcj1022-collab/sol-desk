@@ -85,5 +85,11 @@ class Ledger:
             "events": [dict(r) for r in q("SELECT * FROM events ORDER BY id DESC LIMIT 60")],
         }
 
+    def open_rows(self) -> List[Dict[str, Any]]:
+        return [dict(r) for r in self.db.execute("SELECT * FROM positions WHERE closed_at IS NULL")]
+
+    def realized(self) -> float:
+        return float(self.db.execute("SELECT COALESCE(SUM(pnl),0) FROM positions WHERE closed_at IS NOT NULL").fetchone()[0])
+
     def all_closed(self) -> List[Dict[str, Any]]:
         return [dict(r) for r in self.db.execute("SELECT * FROM positions WHERE closed_at IS NOT NULL")]

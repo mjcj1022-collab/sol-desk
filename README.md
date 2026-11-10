@@ -43,6 +43,18 @@ Get a ping on your phone for every entry, win, loss, kill switch and error:
 
 If those two aren't set, alerts are off. An alert that fails to send never stops trading.
 
+## Run it in the cloud (Render)
+
+`render.yaml` deploys the bot as an always-on service so it doesn't depend on your PC. The trade log lives on a
+persistent disk, and a restart or redeploy resumes where it left off: same cash, same open positions with their stops.
+
+- Cost: Starter plan (~$7/mo) + 1 GB disk. The free plan sleeps when idle, which would stop the bot.
+- Dashboard: the service URL, behind a password (any username). Render generates `SOLDESK_DASH_PASSWORD`; see it under Environment.
+- Telegram: paste `SOLDESK_TG_TOKEN` and `SOLDESK_TG_CHAT` when Render asks.
+- Weekly report: sent to Telegram every 7 days automatically (`SOLDESK_WEEKLY_REPORT=false` to turn off).
+
+Only run one copy at a time (PC *or* cloud), or you'll get two sets of alerts.
+
 ## Edge report
 
 Once the bot has been running a while, check whether it actually has an edge:

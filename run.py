@@ -59,6 +59,9 @@ def main() -> None:
     cfg = Config.from_env()
     if args.mode:
         cfg.mode = args.mode
+    if os.getenv("PORT"):                       # hosted (Render etc.): listen where the platform says
+        cfg.dashboard_port = int(os.environ["PORT"])
+        cfg.dashboard_host = "0.0.0.0"
 
     if args.backtest:
         backtest(cfg, args.backtest, args.ticks or 400)
@@ -76,7 +79,7 @@ def main() -> None:
 
     if not args.no_dashboard:
         from soldesk.dashboard import serve
-        serve(cfg.db_path, cfg.dashboard_port)
+        serve(cfg.db_path, cfg.dashboard_port, cfg.dashboard_host, cfg.dash_password)
         print(f"  dashboard -> http://127.0.0.1:{cfg.dashboard_port}")
 
     eng = Engine(cfg, fast=args.fast)

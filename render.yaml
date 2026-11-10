@@ -1,0 +1,27 @@
+# One-click cloud deploy on Render. Paper money only.
+# Cost: Starter web service (~$7/mo) + 1 GB persistent disk (~$0.25/mo). The free plan sleeps, which would stop the bot.
+services:
+  - type: web
+    name: sol-desk
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py --mode live-data
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: soldesk-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: SOLDESK_DB_PATH
+        value: /data/soldesk.db
+      - key: SOLDESK_DASH_PASSWORD
+        generateValue: true
+      - key: SOLDESK_TG_TOKEN
+        sync: false
+      - key: SOLDESK_TG_CHAT
+        sync: false
