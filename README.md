@@ -43,6 +43,20 @@ Get a ping on your phone for every entry, win, loss, kill switch and error:
 
 If those two aren't set, alerts are off. An alert that fails to send never stops trading.
 
+## Edge report
+
+Once the bot has been running a while, check whether it actually has an edge:
+
+```
+py report.py              # all trades
+py report.py --days 7     # last week
+py report.py --telegram   # also send it to your phone
+```
+
+It reports trades, win rate, profit factor, average trade, max drawdown, a bootstrap 90% range on the
+average trade, and what the same trades would have made at 3% and 5% slippage. The verdict line is one of
+NOT ENOUGH DATA (<30 trades), LOSING, NO PROVEN EDGE, FRAGILE EDGE (dies at 5% slippage) or EDGE LOOKS REAL.
+
 ## Tuning
 
 Copy `.env.example` to `.env`. Every knob lives in `soldesk/config.py` and can be overridden as `SOLDESK_<NAME>`.
