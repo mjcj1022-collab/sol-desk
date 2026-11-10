@@ -59,9 +59,6 @@ def main() -> None:
     cfg = Config.from_env()
     if args.mode:
         cfg.mode = args.mode
-    if os.getenv("PORT"):                       # hosted (Render etc.): listen where the platform says
-        cfg.dashboard_port = int(os.environ["PORT"])
-        cfg.dashboard_host = "0.0.0.0"
 
     if args.backtest:
         backtest(cfg, args.backtest, args.ticks or 400)
@@ -75,12 +72,15 @@ def main() -> None:
     print("=" * 62)
     print("  sol-desk  |  PAPER TRADING ONLY - no wallet, no real money")
     print(f"  mode={cfg.mode}  balance=${cfg.starting_balance:.2f}  tick={cfg.tick_seconds}s")
-    print("=" * 62)
+    print("=" * 62, flush=True)
 
     if not args.no_dashboard:
         from soldesk.dashboard import serve
-        serve(cfg.db_path, cfg.dashboard_port, cfg.dashboard_host, cfg.dash_password)
-        print(f"  dashboard -> http://127.0.0.1:{cfg.dashboard_port}")
+        host = "127.0.0.1"
+        if os.getenv("PORT"):            # cloud hosts (Render, Railway) assign the port
+            cfg.dashboard_port, host = int(os.environ["PORT"]), "0.0.0.0"
+        serve(cfg.db_path, cfg.dashboard_port, host)
+        print(f"  dashboard -> http://{host}:{cfg.dashboard_port}", flush=True)
 
     eng = Engine(cfg, fast=args.fast)
     t0 = time.time()
